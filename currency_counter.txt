@@ -1,0 +1,158 @@
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+const char* ssid = "iPhone";
+const char* password = "qwertyuio";
+WebServer server(80);
+String page = "";
+int count_100 = 0;
+int count_200 = 0;
+unsigned int frequency = 0;
+int a = 0, b = 0;
+int total = 1000;
+void setup() {
+pinMode(2, OUTPUT); // S0
+pinMode(4, OUTPUT); // S1
+pinMode(5, OUTPUT); // S2
+pinMode(15, OUTPUT); // S3
+pinMode(34, INPUT); // OUT
+digitalWrite(2, HIGH);
+digitalWrite(4, LOW);
+Serial.begin(9600);
+Wire.begin(21, 22); // SDA, SCL
+if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+Serial.println(F("SSD1306 allocation failed"));
+for (;;) {}
+}
+delay(2000);
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(3, 0);
+display.println("WELCOME TO");
+display.setCursor(3, 10);
+display.println("IOT DESIGN");
+display.display();
+delay(2000);
+display.clearDisplay();
+WiFi.begin(ssid, password);
+while (WiFi.status() != WL_CONNECTED) {
+delay(500);
+display.setCursor(0, 0);
+display.println("WiFi connecting...");
+display.display();
+}
+display.clearDisplay();
+display.setCursor(0, 0);
+display.println("WiFi connected");
+display.setCursor(0, 10);
+display.println(WiFi.localIP());
+display.display();
+delay(1500);
+display.clearDisplay();
+server.on("/", []() {
+page = "<html><head><title>Currency counter using IoT</title>";
+page += "</head><style type=\"text/css\">table {border-collapse: collapse;";
+page += "}table, th, td {border: 1px solid black;font-size: larger;";
+page += "text-align:center;}</style><body><center><h1>Currency Counter Using IoT ";
+page += "</h1><h3></h3><br><br>";
+page += "<table style=\"width: 600px;height: 250px;\"><tr><th>Currency</th";
+page += "><th>Quantity</th></tr><tr><td>Rs. 100</td><td>" + String(count_100) +
+"</td></tr><tr>";
+page += "<td>Rs. 200</td><td>" + String(count_200) + "</td></tr><tr><th>Total
+Balance:</th><td>";
+page += String(total) + "</td></tr></table></center></body></html>";
+page += "<meta http-equiv=\"refresh\" content=\"2\">";
+server.send(200, "text/html", page);
+});
+server.begin();
+}
+void loop() {
+int sensor = analogRead(A0);
+int red1 = red();
+int blue1 = blue();
+int green1 = green();
+// Display RGB sensor values
+Serial.print("Red : ");
+Serial.println(red1);
+Serial.print("Blue : ");
+Serial.println(blue1);
+Serial.print("Green : ");
+Serial.println(green1);
+// Condition for detecting Rs. 200 note
+if (red1 >= 40 && red1 <= 60 && blue1 >= 70 && blue1 <= 90 && green1 >= 10 && green1
+<= 30 && a == 0 && sensor > 500) {
+a = 1;
+} else if (sensor <= 500 && a == 1) {
+a = 0;
+if (total >= 200) {
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(0, 10);
+display.println("200 Rupees!!!");
+display.display();
+total -= 200;
+delay(2000);
+count_200++;
+display.clearDisplay();
+}
+}
+// Condition for detecting Rs. 100 note
+if (red1 >= 60 && red1 <= 90 && blue1 >= 65 && blue1 <= 90 && green1 >= 10 && green1
+<= 30 && b == 0 && sensor > 500) {
+b = 1;
+} else if (sensor <= 500 && b == 1) {
+b = 0;
+if (total >= 100) {
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(0, 10);
+display.println("100 Rupees!!!");
+display.display();
+total -= 100;
+count_100++;
+delay(2000);
+display.clearDisplay();
+}
+}
+// Display total balance
+display.clearDisplay();
+display.setTextSize(1);
+display.setTextColor(SSD1306_WHITE);
+display.setCursor(0, 0);
+display.println("Total Bal:");
+display.setCursor(60, 0);
+display.println(total);
+display.display();
+delay(1000);
+server.handleClient();
+}
+// Function to measure red frequency
+int red() {
+digitalWrite(5, LOW);
+digitalWrite(15, LOW);
+frequency = pulseIn(34, LOW);
+return frequency;
+}
+// Function to measure blue frequency
+int blue() {
+digitalWrite(5, HIGH);
+digitalWrite(15, HIGH);
+frequency = pulseIn(34, LOW);
+return frequency;
+}
+// Function to measure green frequency
+int green() {
+digitalWrite(5, LOW);
+digitalWrite(15, HIGH);
+frequency = pulseIn(34, LOW);
+return frequency;
+}
